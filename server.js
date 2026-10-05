@@ -25,8 +25,14 @@ const validateEnv = () => {
   if (IS_PROD && process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
     missing.push('JWT_SECRET (must be at least 32 characters in production)');
   }
-  if (missing.length) {
+
+  if (missing.length && IS_PROD) {
+    // Production: refuse to boot rather than serve broken responses.
     throw new Error(`Missing required environment variables:\n  - ${missing.join('\n  - ')}`);
+  }
+  if (missing.length) {
+    // Development: warn, because local setups often run with dummy credentials.
+    console.warn(`[Config] Missing environment variables (ignored outside production):\n  - ${missing.join('\n  - ')}`);
   }
 
   if (process.env.NODE_ENV !== 'test') {
