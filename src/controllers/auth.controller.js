@@ -139,7 +139,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     await PasswordReset.create({ userId: user._id, tokenHash, expiresAt });
 
-    const resetUrl = `${process.env.CLIENT_URL || 'https://api-w3skool.onrender.com'}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.CLIENT_URL || 'https://w3-skool.netlify.app'}/reset-password?token=${token}`;
     sendPasswordReset({ userId: user._id.toString(), token, name: user.name, email: user.email, resetUrl });
   }
 
