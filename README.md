@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # W3Skool — Backend LMS & Course-Commerce Engine
 
 Production-grade RESTful API and domain engine for **W3Skool**, a modern technical academy and Learning Management System (LMS) with course commerce powered by Flutterwave.
@@ -212,3 +213,6 @@ Web    : rootDir Frontend -> npm ci && npm run build -> dist (SPA rewrite /* -> 
 The API validates its environment at boot and refuses to start when a required
 variable is missing; it also shuts down gracefully on SIGTERM and trusts the
 Render proxy so rate limiting stays correct.
+=======
+# W3Skool-Backend
+>>>>>>> ab5ab968f307da0290a444040fe5f227ad985f37

@@ -102,13 +102,15 @@ const runPublishChecks = async (course) => {
     issues.push({ code: 'NO_INSTRUCTOR', message: 'Add an instructor name.' });
   }
 
-  // Paid courses need the owner to have a connected Flutterwave payout account.
-  if (course.price > 0 && course.owner) {
+  // Paid courses need the owner to have an admin-created Flutterwave payout
+  // subaccount. Ownerless legacy courses are also blocked — they must be
+  // claimed by an admin with payout setup before going live.
+  if (Number(course.price || 0) > 0) {
     const hasPayout = await hasActiveSubaccount(course.owner);
     if (!hasPayout) {
       issues.push({
         code: 'PAYOUT_NOT_SETUP',
-        message: 'Connect your payout account before publishing a paid course.',
+        message: 'Payment setup must be completed by the admin before this course can go live: no active payout subaccount is configured for the course owner.',
       });
     }
   }
@@ -260,6 +262,30 @@ const updateCourse = asyncHandler(async (req, res) => {
     if (req.body[field] !== undefined) {
       course[field] = req.body[field];
     }
+  }
+
+  // NOTE: `status` is deliberately NOT editable here. Publishing must go
+  // through PATCH /status or POST /publish so the payout gate cannot be
+  // bypassed with a direct status write. Reject loudly so API clients
+  // (Postman/curl/console) get a clear signal instead of a silent ignore.
+  if (req.body.status !== undefined && req.body.status !== course.status) {
+    return sendError(
+      res,
+      'Course status cannot be changed here. Use the publish endpoint, which verifies payout setup before going live.',
+      422,
+      'USE_PUBLISH_ENDPOINT'
+    );
+  }
+
+  // A price edit must not keep a paid course live without a payout account:
+  // e.g. free -> paid while published. Block the save, keep current status.
+  if (Number(course.price || 0) > 0 && course.status === 'published' && !(await hasActiveSubaccount(course.owner))) {
+    return sendError(
+      res,
+      'Payment setup must be completed by the admin before this course can stay live: no active payout subaccount is configured for the course owner.',
+      422,
+      'PAYOUT_NOT_SETUP'
+    );
   }
 
   // Regenerate slug if title changed

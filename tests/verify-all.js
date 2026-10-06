@@ -209,6 +209,47 @@ const runHttpChecks = async () => {
   } catch (err) {
     assert(false, `upload signature validation failed: ${err.message}`);
   }
+
+  console.log('\n=== [9] Publish Gate (paid course needs payout subaccount) ===');
+  try {
+    const adminRoutesSrc = fs.readFileSync(path.join(root, 'src', 'controllers', 'admin', 'course.admin.js'), 'utf8');
+    // Every live-producing path runs the shared publish checks.
+    const runsChecks = (adminRoutesSrc.match(/runPublishChecks\(course\)/g) || []).length;
+    assert(runsChecks >= 3, `runPublishChecks enforced on status, publish and check paths (${runsChecks} call sites)`);
+    // Issuing PAYOUT_NOT_SETUP when the owner has no active subaccount...
+    assert(
+      /PAYOUT_NOT_SETUP/.test(adminRoutesSrc) && /hasActiveSubaccount\(course\.owner\)/.test(adminRoutesSrc),
+      'runPublishChecks flags PAYOUT_NOT_SETUP for paid courses without an active owner subaccount'
+    );
+    // ...but free courses stay exempt...
+    assert(
+      /Number\(course\.price \|\| 0\) > 0/.test(adminRoutesSrc),
+      'Publish gate only applies to paid courses (free courses exempt)'
+    );
+    // ...and no bypass via the generic metadata PATCH: status writes there are rejected...
+    assert(
+      /USE_PUBLISH_ENDPOINT/.test(adminRoutesSrc),
+      'PATCH /admin/courses/:id rejects direct status changes (USE_PUBLISH_ENDPOINT)'
+    );
+    // ...nor by flipping a published course from free to paid without payout setup.
+    assert(
+      /status === 'published' && !\(await hasActiveSubaccount\(course\.owner\)\)/.test(adminRoutesSrc),
+      'Price edit cannot keep a paid course live without a payout subaccount'
+    );
+    // The subaccount check itself is the real record: active status + Flutterwave id.
+    assert(
+      /Subaccount\.findOne\(\{ adminId, status: 'active' \}\)/.test(adminRoutesSrc) && /flwSubaccountId/.test(adminRoutesSrc),
+      'Subaccount check verifies the real stored record (active + Flutterwave id)'
+    );
+    // Frontend blocks + explains the blocked state instead of implying success.
+    const builder = fs.readFileSync(path.join(root, '..', 'Frontend', 'src', 'pages', 'admin', 'CourseBuilder.jsx'), 'utf8');
+    assert(
+      /disabled=\{!published && !q\.data\?\.canPublish\}/.test(builder) && /PAYOUT_NOT_SETUP/.test(builder) && /\/admin\/payouts/.test(builder),
+      'CourseBuilder disables publish when blocked and links PAYOUT_NOT_SETUP to payouts setup'
+    );
+  } catch (err) {
+    assert(false, `publish gate checks failed: ${err.message}`);
+  }
 };
 
 runHttpChecks()
